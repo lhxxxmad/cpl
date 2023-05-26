@@ -4,7 +4,8 @@ from torch.utils.data import Dataset
 
 from utils import load_json
 import nltk
-
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
 class BaseDataset(Dataset):
     def __init__(self, data_path, vocab, args, **kwargs):
         self.vocab = vocab
