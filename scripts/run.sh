@@ -1,0 +1,1 @@
+python3 ./train.py --config-path config/charades/main.json --log_dir ./log --tag TAG

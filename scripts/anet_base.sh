@@ -1,0 +1,1 @@
+python3 ./train.py --config-path config/activitynet/main.json --log_dir ./log --tag TAG
