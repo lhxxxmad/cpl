@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from models.transformer import DualTransformer
 import math
-
+import pdb
 class CPL(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -29,7 +29,9 @@ class CPL(nn.Module):
  
         self.word_pos_encoder = SinusoidalPositionalEmbedding(config['hidden_size'], 0, 20)
 
-    def forward(self, frames_feat, frames_len, words_id, words_feat, words_len, weights, **kwargs):
+        self.mse_loss = nn.MSELoss(reduction='none')
+
+    def forward(self, frames_feat, frames_len, words_id, words_feat, words_len, weights, duration, **kwargs):
         bsz, n_frames, _ = frames_feat.shape
         pred_vec = self.pred_vec.view(1, 1, -1).expand(bsz, 1, -1)
         frames_feat = torch.cat([frames_feat, pred_vec], dim=1)
@@ -48,7 +50,6 @@ class CPL(nn.Module):
         gauss_param = torch.sigmoid(self.fc_gauss(h[:, -1])).view(bsz*self.num_props, 2)
         gauss_center = gauss_param[:, 0]
         gauss_width = gauss_param[:, 1]
-
         # downsample for effeciency
         props_len = n_frames//4
         keep_idx = torch.linspace(0, n_frames-1, steps=props_len).long()
@@ -61,6 +62,10 @@ class CPL(nn.Module):
 
         gauss_weight = self.generate_gauss_weight(props_len, gauss_center, gauss_width)
         
+        # span level rec video
+        props = torch.stack([torch.clamp(gauss_center-gauss_width/2, min=0), torch.clamp(gauss_center+gauss_width/2, max=1)], dim=-1)
+        rec_video = self.rec_video(props_feat, props_mask, props, words_feat + words_pos, words_mask)
+
         # semantic completion
         words_feat, masked_words = self._mask_words(words_feat, words_len, weights=weights)
         words_feat = words_feat + words_pos
@@ -104,6 +109,7 @@ class CPL(nn.Module):
             'width': gauss_width,
             'center': gauss_center,
             'gauss_weight': gauss_weight,
+            'rec_video_loss': rec_video
         }
     
     
@@ -140,6 +146,25 @@ class CPL(nn.Module):
         right_neg_weight = Gauss(weight, 1-right_center, right_center)
 
         return left_neg_weight, right_neg_weight
+
+    def rec_video(self, props_feat, props_mask, props, words_feat, words_mask):
+        bsz = words_feat.shape[0]
+        masked_props_feat, masked_props_mask = self._mask_frames(props_feat, props_mask, props)
+        words_mask = words_mask.unsqueeze(1) \
+            .expand(bsz, self.num_props, -1).contiguous().view(bsz*self.num_props, -1)
+        words_feat = words_feat.unsqueeze(1) \
+            .expand(bsz, self.num_props, -1, -1).contiguous().view(bsz*self.num_props, words_mask.size(1), -1)
+        enc_out, rec_video = self.trans(masked_props_feat, masked_props_mask, words_feat, words_mask, decoding=1)
+        
+        return self.mse_loss(rec_video, props_feat) #* (1 - masked_props_mask.unsqueeze(-1))
+
+    def _mask_frames(self, props_feat, props_mask, props):
+        video_len = props_mask.sum(1)
+        star, end = (video_len * props[:,0]).to(torch.int), (video_len * props[:,1]).to(torch.int)
+        assert False not in (star < end)
+        for i in range(props_mask.shape[0]):
+            props_mask[i][star[i]:end[i]] = 0
+        return props_feat * props_mask.unsqueeze(-1), props_mask
 
     def _mask_words(self, words_feat, words_len, weights=None):
         token = self.mask_vec.cuda().unsqueeze(0).unsqueeze(0)

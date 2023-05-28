@@ -21,7 +21,7 @@ def cal_nll_loss(logit, idx, mask, weights=None):
     return nll_loss.contiguous(), mean_acc
 
 
-def rec_loss(words_logit, words_id, words_mask, num_props, ref_words_logit=None, **kwargs):
+def rec_loss(words_logit, words_id, words_mask, rec_video_loss, num_props, ref_words_logit=None, **kwargs):
     bsz = words_logit.size(0) // num_props
     words_mask1 = words_mask.unsqueeze(1) \
         .expand(bsz, num_props, -1).contiguous().view(bsz*num_props, -1)
@@ -30,7 +30,11 @@ def rec_loss(words_logit, words_id, words_mask, num_props, ref_words_logit=None,
 
     nll_loss, acc = cal_nll_loss(words_logit, words_id1, words_mask1)
     nll_loss = nll_loss.view(bsz, num_props)
-    min_nll_loss = nll_loss.min(dim=-1)[0]
+
+    rec_video_loss = rec_video_loss.mean(dim=1).mean(dim=1).view(bsz, num_props)
+    nll_loss = nll_loss + rec_video_loss
+
+    min_nll_loss, idx = nll_loss.min(dim=-1)
 
     final_loss = min_nll_loss.mean()
 

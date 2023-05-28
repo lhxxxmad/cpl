@@ -26,8 +26,8 @@ class DualTransformer(nn.Module):
         assert decoding in [1, 2]
         if decoding == 1:
             if enc_out is None:
-                enc_out, _ = self.decoder2(None, None, src2, src_mask2)
-            out, weight = self.decoder1(enc_out, src_mask2, src1, src_mask1)
+                enc_out, _ = self.decoder2(None, None, src2, src_mask2, tgt_gauss_weight=gauss_weight)
+            out, weight = self.decoder1(enc_out, src_mask2, src1, src_mask1, src_gauss_weight=gauss_weight)
         elif decoding == 2:
             if enc_out is None:
                 enc_out, _ = self.decoder1(None, None, src1, src_mask1, tgt_gauss_weight=gauss_weight)

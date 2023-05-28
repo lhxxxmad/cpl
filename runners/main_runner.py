@@ -122,7 +122,7 @@ class MainRunner:
                                                   torch.clamp(center+width/2, max=1)], dim=-1)
                     selected_props = selected_props.cpu().numpy()
                     gt = gt / durations[:, np.newaxis]
-                    
+                    # torch.stack([torch.clamp(gauss_center-gauss_width/2, min=0), torch.clamp(gauss_center+gauss_width/2, max=1)], dim=-1)
                     if 'vote' in self.args and self.args['vote']:
                         if  self.args['dataset']['dataset'] == 'CharadesSTA':
                             # On charades, the IoU of many proposals is small, and it doesn't make sense to get these proposals to vote. 

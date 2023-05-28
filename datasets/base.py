@@ -98,6 +98,7 @@ def build_collate_data(max_num_frames, max_num_words, frame_dim, word_dim):
         words_feat = np.zeros([bsz, max(words_len) + 1, word_dim]).astype(np.float32)
         words_id = np.zeros([bsz, max(words_len)]).astype(np.int64)
         weights = np.zeros([bsz, max(words_len)]).astype(np.float32)
+        durations = np.zeros(bsz).astype(np.float32)
         for i, sample in enumerate(samples):
             frames_feat[i, :len(sample['frames_feat'])] = sample['frames_feat']
             keep = min(len(sample['words_feat']), words_feat.shape[1])
@@ -107,7 +108,7 @@ def build_collate_data(max_num_frames, max_num_words, frame_dim, word_dim):
             keep = min(len(sample['weights']), weights.shape[1])
             tmp = np.exp(sample['weights'][:keep])
             weights[i, :keep] = tmp / np.sum(tmp)
-
+            durations[i] = sample['raw'][1]
         batch.update({
             'net_input': {
                 'frames_feat': torch.from_numpy(frames_feat),
@@ -116,6 +117,7 @@ def build_collate_data(max_num_frames, max_num_words, frame_dim, word_dim):
                 'words_id': torch.from_numpy(words_id),
                 'weights': torch.from_numpy(weights),
                 'words_len': torch.from_numpy(np.asarray(words_len)),
+                'duration': torch.from_numpy(durations),
             }
         })
         return batch
