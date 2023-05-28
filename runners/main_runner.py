@@ -114,6 +114,8 @@ class MainRunner:
                         .expand(bsz, num_props, -1).contiguous().view(bsz*num_props, -1)
 
                     nll_loss, acc = cal_nll_loss(output['words_logit'], words_id, words_mask)
+                    rec_video_loss = output['rec_video'].mean(dim=1).mean(dim=1)
+                    nll_loss = nll_loss + rec_video_loss
                     idx = nll_loss.view(bsz, num_props).argsort(dim=-1)
 
                     width = output['width'].view(bsz, num_props).gather(index=idx, dim=-1)
